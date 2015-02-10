@@ -24,6 +24,7 @@ library
   build-tools:         hsc2hs
   default-language:    Haskell2010
   include-dirs: src/cbits
+  ghc-options: -O2 -threaded
   cc-options: -DWEBRTC_POSIX -fPIC
   C-sources:
     src/cbits/webrtc/common_audio/signal_processing/downsample_fast.c
@@ -45,10 +46,3 @@ library
     src/cbits/webrtc/common_audio/vad/vad_gmm.c
     src/cbits/webrtc/common_audio/vad/vad_filterbank.c
     src/cbits/webrtc/common_audio/vad/vad_sp.c
-
-executable Test
-  Build-Depends: base >= 4.7, webrtc-vad
-  hs-source-dirs:      src
-  Main-Is: Test.hs
-  ghc-options: -optl-pthread
-
