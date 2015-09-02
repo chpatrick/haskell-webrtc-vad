@@ -1,5 +1,5 @@
 name:                webrtc-vad
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:            Easy voice activity detection
 description:         A simple library wrapping WebRTC's voice activity detection engine.
 license:             MIT
@@ -11,6 +11,13 @@ category:            Sound
 build-type:          Simple
 -- extra-source-files:  
 cabal-version:       >=1.10
+extra-source-files:
+  src/cbits/webrtc/*.h
+  src/cbits/webrtc/common_audio/signal_processing/*.h
+  src/cbits/webrtc/common_audio/signal_processing/include/*.h
+  src/cbits/webrtc/common_audio/vad/*.h
+  src/cbits/webrtc/common_audio/vad/include/*.h
+  src/cbits/webrtc/system_wrappers/interface/*.h
 
 source-repository head
   type:                git
@@ -24,9 +31,10 @@ library
   hs-source-dirs:      src
   build-tools:         hsc2hs
   default-language:    Haskell2010
-  include-dirs: src/cbits
-  cc-options: -DWEBRTC_POSIX -fPIC
-  C-sources:
+  include-dirs:        src/cbits
+  cc-options:          -DWEBRTC_POSIX -fPIC
+  ghc-options:         -Wall
+  c-sources:
     src/cbits/webrtc/common_audio/signal_processing/downsample_fast.c
     src/cbits/webrtc/common_audio/signal_processing/min_max_operations.c
     src/cbits/webrtc/common_audio/signal_processing/cross_correlation.c

@@ -9,10 +9,10 @@ module Sound.VAD.WebRTC
   , VADException(..)
   ) where
 
-import Control.Applicative
 import Control.Exception
 import Control.Monad
 import Control.Monad.Primitive
+import Data.Functor
 import Data.Int
 import Data.Typeable
 import qualified Data.Vector.Storable as V
@@ -78,7 +78,7 @@ process sampleRate buffer (VAD inst) = unsafePrimToPrim $ withForeignPtr inst $ 
   case res of
     1 -> return True
     0 -> return False
-    -1 -> throwIO $ VADException "Error while processing buffer."
+    _ -> throwIO $ VADException "Error while processing buffer."
 
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_ValidRateAndFrameLength" _WebRtcVad_ValidRateAndFrameLength :: CInt -> CInt -> CInt
 
@@ -91,7 +91,8 @@ foreign import ccall unsafe "webrtc_vad.h WebRtcVad_ValidRateAndFrameLength" _We
 --
 -- @frameLength@: Speech frame buffer length in number of samples.
 validRateAndFrameLength :: Int -> Int -> Bool
-validRateAndFrameLength rate frameLength
-  = case _WebRtcVad_ValidRateAndFrameLength (fromIntegral rate) (fromIntegral frameLength) of
-      0 -> True
-      -1 -> False
+validRateAndFrameLength rate frameLength =
+  case _WebRtcVad_ValidRateAndFrameLength (fromIntegral rate) (fromIntegral frameLength) of
+    0  -> True
+    -1 -> False
+    _  -> throw $ VADException "Unknown result value."
