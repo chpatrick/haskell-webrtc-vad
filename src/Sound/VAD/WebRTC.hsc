@@ -1,21 +1,20 @@
 {-# LANGUAGE ForeignFunctionInterface, DeriveDataTypeable #-}
 
 module Sound.VAD.WebRTC
-  ( VAD(), VADException(..)
+  ( VAD()
   , create
-  , Sound.VAD.WebRTC.free
-  , Sound.VAD.WebRTC.init
   , Aggressiveness, setMode
-  , process
   , validRateAndFrameLength
+  , process
+  , VADException(..)
   ) where
 
 import Control.Applicative
 import Control.Exception
 import Control.Monad
-import qualified Data.ByteString as BS
 import Data.Int
 import Data.Typeable
+import qualified Data.Vector.Storable as V
 import Foreign
 import Foreign.C
 
@@ -31,38 +30,50 @@ orDie m err = do
 
 data VadInst
 
-newtype VAD = VAD (Ptr VadInst)
+-- | A VAD instance.
+newtype VAD = VAD (ForeignPtr VadInst)
 
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Create" _WebRtcVad_Create :: Ptr (Ptr VadInst) -> IO CInt
+foreign import ccall unsafe "webrtc_vad.h & WebRtcVad_Free" _WebRtcVad_Free :: FunPtr (Ptr VadInst -> IO ())
+foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Init" _WebRtcVad_Init :: Ptr VadInst -> IO CInt
 
+-- | Create and initialize a VAD instance.
 create :: IO VAD
 create = alloca $ \ptr -> do
   _WebRtcVad_Create ptr `orDie` "Could not create VAD instance."
-  VAD <$> peek ptr
+  vad <- peek ptr
+  _WebRtcVad_Init vad `orDie` "Could not initialize VAD instance - NULL pointer or Default mode could not be set."
+  VAD <$> newForeignPtr _WebRtcVad_Free vad
 
--- we can use the foreign import directly
-foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Free" free :: VAD -> IO ()
+foreign import ccall unsafe "webrtc_vad.h WebRtcVad_set_mode" _WebRtcVad_set_mode :: Ptr VadInst -> CInt -> IO CInt
 
-foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Init" _WebRtcVad_Init :: VAD -> IO CInt
-
-init :: VAD -> IO ()
-init vad
-  = _WebRtcVad_Init vad `orDie` "Could not initialize VAD instance - NULL pointer or Default mode could not be set."
-
-foreign import ccall unsafe "webrtc_vad.h WebRtcVad_set_mode" _WebRtcVad_set_mode :: VAD -> CInt -> IO CInt
-
+-- | Aggressiveness mode (0, 1, 2, or 3).
 type Aggressiveness = Int
 
+-- | @setMode mode vad@
+--
+-- Sets the VAD operating mode. A more aggressive (higher mode) VAD is more
+-- restrictive in reporting speech. Put in other words the probability of being
+-- speech when the VAD returns 1 is increased with increasing mode. As a
+-- consequence also the missed detection rate goes up.
 setMode :: Aggressiveness -> VAD -> IO ()
-setMode aggr vad = do
+setMode aggr (VAD inst) = withForeignPtr inst $ \vad ->
   _WebRtcVad_set_mode vad (fromIntegral aggr) `orDie` "NULL pointer, mode could not be set or the VAD instance has not been initialized"
 
-foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Process" _WebRtcVad_Process :: VAD -> CInt -> Ptr Int16 -> CInt -> IO CInt
+foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Process" _WebRtcVad_Process :: Ptr VadInst -> CInt -> Ptr Int16 -> CInt -> IO CInt
 
-process :: Int -> BS.ByteString -> VAD -> IO Bool
-process sampleRate buffer vad = do
-  res <- BS.useAsCStringLen buffer $ \( ptr, len ) ->
-    _WebRtcVad_Process vad (fromIntegral sampleRate) (castPtr ptr) (fromIntegral (len `div` 2))
+-- | @process sampleRate audioFrame vad@
+--
+-- Calculates a VAD decision for the @audioFrame@. For valid sampling rates
+-- frame lengths, see the description of `validRatesAndFrameLengths`.
+--
+-- @sampleRate@: Sampling frequency (Hz): 8000, 16000, or 32000
+--
+-- @audioFrame@: Audio frame buffer (mono signed 16-bit).
+process :: Int -> V.Vector Int16 -> VAD -> IO Bool
+process sampleRate buffer (VAD inst) = withForeignPtr inst $ \vad -> do
+  res <- V.unsafeWith buffer $ \ptr ->
+    _WebRtcVad_Process vad (fromIntegral sampleRate) ptr (fromIntegral $ V.length buffer)
   case res of
     1 -> return True
     0 -> return False
@@ -70,6 +81,14 @@ process sampleRate buffer vad = do
 
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_ValidRateAndFrameLength" _WebRtcVad_ValidRateAndFrameLength :: CInt -> CInt -> CInt
 
+-- | @validRateAndFrameLength rate frameLength@
+--
+-- Checks for valid combinations of @rate@ and @frameLength@. We support 10,
+-- 20 and 30 ms frames and the rates 8000, 16000 and 32000 Hz.
+--
+-- @rate@: Sampling frequency (Hz).
+--
+-- @frameLength@: Speech frame buffer length in number of samples.
 validRateAndFrameLength :: Int -> Int -> Bool
 validRateAndFrameLength rate frameLength
   = case _WebRtcVad_ValidRateAndFrameLength (fromIntegral rate) (fromIntegral frameLength) of
