@@ -12,6 +12,7 @@ module Sound.VAD.WebRTC
 import Control.Applicative
 import Control.Exception
 import Control.Monad
+import Control.Monad.Primitive
 import Data.Int
 import Data.Typeable
 import qualified Data.Vector.Storable as V
@@ -30,16 +31,16 @@ orDie m err = do
 
 data VadInst
 
--- | A VAD instance.
-newtype VAD = VAD (ForeignPtr VadInst)
+-- | A VAD instance with a state token (like `MVector`).
+newtype VAD s = VAD (ForeignPtr VadInst)
 
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Create" _WebRtcVad_Create :: Ptr (Ptr VadInst) -> IO CInt
 foreign import ccall unsafe "webrtc_vad.h & WebRtcVad_Free" _WebRtcVad_Free :: FunPtr (Ptr VadInst -> IO ())
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Init" _WebRtcVad_Init :: Ptr VadInst -> IO CInt
 
 -- | Create and initialize a VAD instance.
-create :: IO VAD
-create = alloca $ \ptr -> do
+create :: PrimMonad m => m (VAD (PrimState m))
+create = unsafePrimToPrim $ alloca $ \ptr -> do
   _WebRtcVad_Create ptr `orDie` "Could not create VAD instance."
   vad <- peek ptr
   _WebRtcVad_Init vad `orDie` "Could not initialize VAD instance - NULL pointer or Default mode could not be set."
@@ -56,8 +57,8 @@ type Aggressiveness = Int
 -- restrictive in reporting speech. Put in other words the probability of being
 -- speech when the VAD returns 1 is increased with increasing mode. As a
 -- consequence also the missed detection rate goes up.
-setMode :: Aggressiveness -> VAD -> IO ()
-setMode aggr (VAD inst) = withForeignPtr inst $ \vad ->
+setMode :: PrimMonad m => Aggressiveness -> VAD (PrimState m) -> m ()
+setMode aggr (VAD inst) = unsafePrimToPrim $ withForeignPtr inst $ \vad ->
   _WebRtcVad_set_mode vad (fromIntegral aggr) `orDie` "NULL pointer, mode could not be set or the VAD instance has not been initialized"
 
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Process" _WebRtcVad_Process :: Ptr VadInst -> CInt -> Ptr Int16 -> CInt -> IO CInt
@@ -70,8 +71,8 @@ foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Process" _WebRtcVad_Process 
 -- @sampleRate@: Sampling frequency (Hz): 8000, 16000, or 32000
 --
 -- @audioFrame@: Audio frame buffer (mono signed 16-bit).
-process :: Int -> V.Vector Int16 -> VAD -> IO Bool
-process sampleRate buffer (VAD inst) = withForeignPtr inst $ \vad -> do
+process :: PrimMonad m => Int -> V.Vector Int16 -> VAD (PrimState m) -> m Bool
+process sampleRate buffer (VAD inst) = unsafePrimToPrim $ withForeignPtr inst $ \vad -> do
   res <- V.unsafeWith buffer $ \ptr ->
     _WebRtcVad_Process vad (fromIntegral sampleRate) ptr (fromIntegral $ V.length buffer)
   case res of
