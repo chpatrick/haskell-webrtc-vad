@@ -1,7 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface, DeriveDataTypeable #-}
 
 module Sound.VAD.WebRTC
-  ( VAD()
+  ( VAD(), IOVAD
   , create
   , Aggressiveness, setMode
   , validRateAndFrameLength
@@ -34,6 +34,9 @@ data VadInst
 -- | A VAD instance with a state token (like `MVector`).
 newtype VAD s = VAD (ForeignPtr VadInst)
 
+-- | A VAD instance for use in `IO`.
+type IOVAD = VAD RealWorld
+
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Create" _WebRtcVad_Create :: Ptr (Ptr VadInst) -> IO CInt
 foreign import ccall unsafe "webrtc_vad.h & WebRtcVad_Free" _WebRtcVad_Free :: FunPtr (Ptr VadInst -> IO ())
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Init" _WebRtcVad_Init :: Ptr VadInst -> IO CInt
@@ -51,6 +54,9 @@ foreign import ccall unsafe "webrtc_vad.h WebRtcVad_set_mode" _WebRtcVad_set_mod
 -- | Aggressiveness mode (0, 1, 2, or 3).
 type Aggressiveness = Int
 
+withVAD :: PrimMonad m => (Ptr VadInst -> IO a) -> VAD (PrimState m) -> m a
+withVAD f (VAD finst) = unsafePrimToPrim $ withForeignPtr finst f
+
 -- | @setMode mode vad@
 --
 -- Sets the VAD operating mode. A more aggressive (higher mode) VAD is more
@@ -58,7 +64,7 @@ type Aggressiveness = Int
 -- speech when the VAD returns 1 is increased with increasing mode. As a
 -- consequence also the missed detection rate goes up.
 setMode :: PrimMonad m => Aggressiveness -> VAD (PrimState m) -> m ()
-setMode aggr (VAD inst) = unsafePrimToPrim $ withForeignPtr inst $ \vad ->
+setMode aggr = withVAD $ \vad ->
   _WebRtcVad_set_mode vad (fromIntegral aggr) `orDie` "NULL pointer, mode could not be set or the VAD instance has not been initialized"
 
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Process" _WebRtcVad_Process :: Ptr VadInst -> CInt -> Ptr Int16 -> CInt -> IO CInt
@@ -72,7 +78,7 @@ foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Process" _WebRtcVad_Process 
 --
 -- @audioFrame@: Audio frame buffer (mono signed 16-bit).
 process :: PrimMonad m => Int -> V.Vector Int16 -> VAD (PrimState m) -> m Bool
-process sampleRate buffer (VAD inst) = unsafePrimToPrim $ withForeignPtr inst $ \vad -> do
+process sampleRate buffer = withVAD $ \vad -> do
   res <- V.unsafeWith buffer $ \ptr ->
     _WebRtcVad_Process vad (fromIntegral sampleRate) ptr (fromIntegral $ V.length buffer)
   case res of
