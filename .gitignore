@@ -1,1 +1,5 @@
 dist/
+.stack-work/
+*~
+.DS_Store
+.vscode

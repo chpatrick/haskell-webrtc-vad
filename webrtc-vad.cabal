@@ -1,5 +1,6 @@
+cabal-version: 2.2
 name:                webrtc-vad
-version:             0.1.0.3
+version:             0.1.0.4
 synopsis:            Easy voice activity detection
 description:         A simple library wrapping WebRTC's voice activity detection engine.
 license:             MIT
@@ -10,14 +11,17 @@ maintainer:          chpatrick@gmail.com
 category:            Sound
 build-type:          Simple
 -- extra-source-files:  
-cabal-version:       >=1.10
 extra-source-files:
   src/cbits/webrtc/*.h
+  src/cbits/webrtc/rtc_base/*.h
+  src/cbits/webrtc/rtc_base/numerics/*.h
+  src/cbits/webrtc/rtc_base/system/*.h
+  src/cbits/webrtc/common_audio/third_party/spl_sqrt_floor/*.h
   src/cbits/webrtc/common_audio/signal_processing/*.h
   src/cbits/webrtc/common_audio/signal_processing/include/*.h
   src/cbits/webrtc/common_audio/vad/*.h
   src/cbits/webrtc/common_audio/vad/include/*.h
-  src/cbits/webrtc/system_wrappers/interface/*.h
+  src/cbits/webrtc/system_wrappers/include/*.h
 
 source-repository head
   type:                git
@@ -31,26 +35,50 @@ library
   hs-source-dirs:      src
   build-tools:         hsc2hs
   default-language:    Haskell2010
-  include-dirs:        src/cbits
+  include-dirs:        src/cbits/webrtc
+                     , src/cbits
   cc-options:          -DWEBRTC_POSIX -fPIC
+  cxx-options:         -std=c++11 -DWEBRTC_POSIX -fPIC
   ghc-options:         -Wall
+  extra-libraries:     stdc++
   c-sources:
-    src/cbits/webrtc/common_audio/signal_processing/downsample_fast.c
-    src/cbits/webrtc/common_audio/signal_processing/min_max_operations.c
-    src/cbits/webrtc/common_audio/signal_processing/cross_correlation.c
-    src/cbits/webrtc/common_audio/signal_processing/vector_scaling_operations.c
-    src/cbits/webrtc/common_audio/signal_processing/spl_init.c
-    src/cbits/webrtc/common_audio/signal_processing/resample_48khz.c
-    src/cbits/webrtc/common_audio/signal_processing/resample_by_2_internal.c
-    src/cbits/webrtc/common_audio/signal_processing/resample_fractional.c
-    src/cbits/webrtc/common_audio/signal_processing/division_operations.c
-    src/cbits/webrtc/common_audio/signal_processing/energy.c
+    src/cbits/webrtc/common_audio/signal_processing/auto_corr_to_refl_coef.c
+    src/cbits/webrtc/common_audio/signal_processing/auto_correlation.c
     src/cbits/webrtc/common_audio/signal_processing/complex_bit_reverse.c
     src/cbits/webrtc/common_audio/signal_processing/complex_fft.c
+    src/cbits/webrtc/common_audio/signal_processing/copy_set_operations.c
+    src/cbits/webrtc/common_audio/signal_processing/cross_correlation.c
+    src/cbits/webrtc/common_audio/signal_processing/division_operations.c
+    src/cbits/webrtc/common_audio/signal_processing/downsample_fast.c
+    src/cbits/webrtc/common_audio/signal_processing/energy.c
+    src/cbits/webrtc/common_audio/signal_processing/filter_ar.c
+    src/cbits/webrtc/common_audio/signal_processing/filter_ar_fast_q12.c
+    src/cbits/webrtc/common_audio/signal_processing/filter_ma_fast_q12.c
+    src/cbits/webrtc/common_audio/signal_processing/get_hanning_window.c
     src/cbits/webrtc/common_audio/signal_processing/get_scaling_square.c
+    src/cbits/webrtc/common_audio/signal_processing/ilbc_specific_functions.c
+    src/cbits/webrtc/common_audio/signal_processing/levinson_durbin.c
+    src/cbits/webrtc/common_audio/signal_processing/lpc_to_refl_coef.c
+    src/cbits/webrtc/common_audio/signal_processing/min_max_operations.c
+    src/cbits/webrtc/common_audio/signal_processing/randomization_functions.c
     src/cbits/webrtc/common_audio/signal_processing/real_fft.c
-    src/cbits/webrtc/common_audio/vad/webrtc_vad.c
+    src/cbits/webrtc/common_audio/signal_processing/refl_coef_to_lpc.c
+    src/cbits/webrtc/common_audio/signal_processing/resample.c
+    src/cbits/webrtc/common_audio/signal_processing/resample_48khz.c
+    src/cbits/webrtc/common_audio/signal_processing/resample_by_2.c
+    src/cbits/webrtc/common_audio/signal_processing/resample_by_2_internal.c
+    src/cbits/webrtc/common_audio/signal_processing/resample_fractional.c
+    src/cbits/webrtc/common_audio/signal_processing/spl_init.c
+    src/cbits/webrtc/common_audio/signal_processing/spl_inl.c
+    src/cbits/webrtc/common_audio/signal_processing/spl_sqrt.c
+    src/cbits/webrtc/common_audio/signal_processing/splitting_filter.c
+    src/cbits/webrtc/common_audio/signal_processing/sqrt_of_one_minus_x_squared.c
+    src/cbits/webrtc/common_audio/signal_processing/vector_scaling_operations.c
     src/cbits/webrtc/common_audio/vad/vad_core.c
-    src/cbits/webrtc/common_audio/vad/vad_gmm.c
     src/cbits/webrtc/common_audio/vad/vad_filterbank.c
+    src/cbits/webrtc/common_audio/vad/vad_gmm.c
     src/cbits/webrtc/common_audio/vad/vad_sp.c
+    src/cbits/webrtc/common_audio/vad/webrtc_vad.c
+    src/cbits/webrtc/common_audio/third_party/spl_sqrt_floor/spl_sqrt_floor.c
+  cxx-sources:
+    src/cbits/webrtc/rtc_base/checks.cc
