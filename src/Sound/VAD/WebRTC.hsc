@@ -12,7 +12,6 @@ module Sound.VAD.WebRTC
 import Control.Exception
 import Control.Monad
 import Control.Monad.Primitive
-import Data.Functor
 import Data.Int
 import Data.Typeable
 import qualified Data.Vector.Storable as V
@@ -37,17 +36,16 @@ newtype VAD s = VAD (ForeignPtr VadInst)
 -- | A VAD instance for use in `IO`.
 type IOVAD = VAD RealWorld
 
-foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Create" _WebRtcVad_Create :: Ptr (Ptr VadInst) -> IO CInt
+foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Create" _WebRtcVad_Create :: IO (Ptr VadInst)
 foreign import ccall unsafe "webrtc_vad.h & WebRtcVad_Free" _WebRtcVad_Free :: FunPtr (Ptr VadInst -> IO ())
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_Init" _WebRtcVad_Init :: Ptr VadInst -> IO CInt
 
 -- | Create and initialize a VAD instance.
 create :: PrimMonad m => m (VAD (PrimState m))
-create = unsafePrimToPrim $ alloca $ \ptr -> do
-  _WebRtcVad_Create ptr `orDie` "Could not create VAD instance."
-  vad <- peek ptr
-  _WebRtcVad_Init vad `orDie` "Could not initialize VAD instance - NULL pointer or Default mode could not be set."
-  VAD <$> newForeignPtr _WebRtcVad_Free vad
+create = unsafePrimToPrim $ do
+  ptr <- _WebRtcVad_Create
+  _WebRtcVad_Init ptr `orDie` "Could not initialize VAD instance - NULL pointer or Default mode could not be set."
+  VAD <$> newForeignPtr _WebRtcVad_Free ptr
 
 foreign import ccall unsafe "webrtc_vad.h WebRtcVad_set_mode" _WebRtcVad_set_mode :: Ptr VadInst -> CInt -> IO CInt
 
